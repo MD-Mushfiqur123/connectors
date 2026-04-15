@@ -2,6 +2,10 @@
 
 __version__ = "0.1.0"
 
+from connectors_sdk.connectors.external_import.base_data_processor import (
+    BaseDataProcessor,
+)
+from connectors_sdk.connectors.external_import.connector import ExternalImportConnector
 from connectors_sdk.logging.logger import ConnectorLogger, logger
 from connectors_sdk.connectors.external_import._work_manager import WorkManager
 from connectors_sdk.connectors.external_import.base_data_processor import (
@@ -34,6 +38,9 @@ from connectors_sdk.settings.exceptions import (
 from connectors_sdk.states.states import ExternalImportConnectorState
 
 __all__ = [
+    # Base Connectors
+    "BaseDataProcessor",
+    "ExternalImportConnector",
     # Logger
     "ConnectorLogger",  # mostly for typing purposes
     "logger",
