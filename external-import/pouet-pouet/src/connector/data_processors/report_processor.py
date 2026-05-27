@@ -6,14 +6,13 @@ from time import sleep
 from typing import TYPE_CHECKING, Generator, override
 
 from connector.converter_to_stix import ConverterToStix
-from connectors_sdk import BaseDataProcessor, logger
+from connectors_sdk import BaseDataProcessor
 from connectors_sdk.models import BaseIdentifiedObject, Report
 from pouet_pouet_client.api_client import PouetPouetClient
 
 if TYPE_CHECKING:
-    from connector.settings import ConnectorSettings
-    from connector.state_manager import ConnectorStateManager
-    from pycti import OpenCTIConnectorHelper
+    from connector.connector_settings import ConnectorSettings
+    from connector.connector_state import ConnectorState
 
 
 class ReportProcessor(BaseDataProcessor):
@@ -23,34 +22,22 @@ class ReportProcessor(BaseDataProcessor):
     from the Pouet API before it is ingested into OpenCTI.
     """
 
-    def __init__(
-        self,
-        config: "ConnectorSettings",
-        helper: "OpenCTIConnectorHelper",
-        state_manager: "ConnectorStateManager",
-    ):
-        """
-        Initialize the `ReportProcessor` with its dependencies.
-        """
-        super().__init__(
-            config=config,
-            helper=helper,
-            state_manager=state_manager,
-        )
-        # Redundant assignments kept for typing purposes
-        self.config = config
-        self.state_manager = state_manager
+    # Override the typing of `BaseDataProcessor` with concrete types
+    settings: "ConnectorSettings"
+    state: "ConnectorState"
 
-        self.logger = logger.get_child("report_processor")
-
+    @override
+    def post_init(self):
+        """
+        Post-initialization method to set up any additional state or perform actions after the processor has been initialized.
+        In this case, it initializes the last ingested timestamp from the state.
+        """
         self.api_client = PouetPouetClient(
-            helper=helper,
-            base_url=self.config.pouet_pouet.api_base_url,
-            api_key=self.config.pouet_pouet.api_key,
+            base_url=self.settings.pouet_pouet.api_base_url,
+            api_key=self.settings.pouet_pouet.api_key,
         )
         self.converter_to_stix = ConverterToStix(
-            helper=helper,
-            tlp_level=self.config.pouet_pouet.tlp_level,
+            tlp_level=self.settings.pouet_pouet.tlp_level,
         )
 
     @override
@@ -60,7 +47,7 @@ class ReportProcessor(BaseDataProcessor):
         This method return retrieved data as a generator of dictionaries,
         where each dictionary represents a report to be ingested into OpenCTI.
         """
-        last_ingested_at = self.state_manager.last_ingested_at
+        last_ingested_at = self.state.last_ingested_at
 
         self.logger.info("Fetching reports with filters", {"since": last_ingested_at})
 
@@ -82,25 +69,31 @@ class ReportProcessor(BaseDataProcessor):
         """
         self.logger.info("Transforming reports into OCTI objects")
 
-        for pouet_report in data:
-            sleep(1)  # simulate long running conversion
-            octi_report = self.converter_to_stix.create_report(pouet_report)
+        try:
+            for pouet_report in data:
+                sleep(1)  # simulate long running conversion
+                octi_report = self.converter_to_stix.create_report(pouet_report)
 
-            octi_objects = [
-                self.converter_to_stix.tlp_marking,
-                self.converter_to_stix.author,
-                octi_report,
-            ]
+                octi_objects = [
+                    self.converter_to_stix.tlp_marking,
+                    self.converter_to_stix.author,
+                    octi_report,
+                ]
 
-            self.logger.debug(
-                "Transformed report into OCTI objects",
-                {
-                    "report_name": pouet_report["name"],
-                    "octi_objects_count": len(octi_objects),
-                },
+                self.logger.debug(
+                    "Transformed report into OCTI objects",
+                    {
+                        "report_name": pouet_report["name"],
+                        "octi_objects_count": len(octi_objects),
+                    },
+                )
+
+                yield octi_objects
+        except Exception as e:
+            self.logger.error(
+                "Error processing reports. Stopping the ingestion, will retry on next run.",
+                {"error": str(e)},
             )
-
-            yield octi_objects
 
     @override
     def send(self, data: Generator[list[BaseIdentifiedObject], None, None]) -> None:  # type: ignore[override]
@@ -111,7 +104,8 @@ class ReportProcessor(BaseDataProcessor):
 
         for octi_objects in data:
             # Call the send method of the BaseDataProcessor to handle the actual sending of data
-            super().send(data=octi_objects)
+            self.work_name = f"Reports since {self.state.last_ingested_at.isoformat(timespec='seconds') if self.state.last_ingested_at else 'the beginning'}"
+            super().send(bundle_objects=octi_objects)
 
             # Update the state with custom fields after sending the data to OpenCTI
             bundle_last_report = next(
@@ -138,8 +132,6 @@ class ReportProcessor(BaseDataProcessor):
                 ):
                     last_report = bundle_last_report
 
-                    self.state_manager.last_pouet_id = bundle_last_report.id
-                    self.state_manager.last_ingested_at = (
-                        bundle_last_report.publication_date
-                    )
-                    self.state_manager.save()
+                    self.state.last_pouet_id = bundle_last_report.id
+                    self.state.last_ingested_at = bundle_last_report.publication_date
+                    self.state.save()

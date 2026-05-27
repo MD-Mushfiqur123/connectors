@@ -4,7 +4,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
-from connectors_sdk.connectors.external_import.logger import ConnectorLogger
+from connectors_sdk.connectors.external_import.logger import Logger
 
 
 @pytest.fixture
@@ -27,9 +27,9 @@ def mock_helper() -> MagicMock:
 
 
 @pytest.fixture
-def mock_logger(mock_helper: MagicMock) -> ConnectorLogger:
-    """ConnectorLogger backed by mock helper."""
-    return ConnectorLogger(mock_helper)
+def mock_logger(mock_helper: MagicMock) -> Logger:
+    """Logger backed by mock helper."""
+    return Logger(mock_helper)
 
 
 @pytest.fixture

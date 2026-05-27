@@ -3,17 +3,17 @@ This module contains the implementation of the `IndicatorProcessor` class for th
 """
 
 from time import sleep
+from datetime import date
 from typing import TYPE_CHECKING, override
 
 from connector.converter_to_stix import ConverterToStix
-from connectors_sdk import BaseDataProcessor, logger
+from connectors_sdk import BaseDataProcessor
 from connectors_sdk.models import BaseIdentifiedObject
 from pouet_pouet_client.api_client import PouetPouetClient
 
 if TYPE_CHECKING:
-    from connector.settings import ConnectorSettings
-    from connector.state_manager import ConnectorStateManager
-    from pycti import OpenCTIConnectorHelper
+    from connector.connector_settings import ConnectorSettings
+    from connector.connector_state import ConnectorState
 
 
 class IndicatorProcessor(BaseDataProcessor):
@@ -23,34 +23,22 @@ class IndicatorProcessor(BaseDataProcessor):
     from the Pouet API before it is ingested into OpenCTI.
     """
 
-    def __init__(
-        self,
-        config: "ConnectorSettings",
-        helper: "OpenCTIConnectorHelper",
-        state_manager: "ConnectorStateManager",
-    ):
-        """
-        Initialize the `IndicatorProcessor` with its dependencies.
-        """
-        super().__init__(
-            config=config,
-            helper=helper,
-            state_manager=state_manager,
-        )
-        # Redundant assignments kept for typing purposes
-        self.config = config
-        self.state_manager = state_manager
+    # Override the typing of `BaseDataProcessor` with concrete types
+    settings: "ConnectorSettings"
+    state: "ConnectorState"
 
-        self.logger = logger.get_child("indicator_processor")
-
+    @override
+    def post_init(self):
+        """
+        Post-initialization method to set up any additional state or perform actions after the processor has been initialized.
+        In this case, it initializes the last ingested timestamp from the state.
+        """
         self.api_client = PouetPouetClient(
-            helper=helper,
-            base_url=self.config.pouet_pouet.api_base_url,
-            api_key=self.config.pouet_pouet.api_key,
+            base_url=self.settings.pouet_pouet.api_base_url,
+            api_key=self.settings.pouet_pouet.api_key,
         )
         self.converter_to_stix = ConverterToStix(
-            helper=helper,
-            tlp_level=self.config.pouet_pouet.tlp_level,
+            tlp_level=self.settings.pouet_pouet.tlp_level,
         )
 
     @override
@@ -96,3 +84,13 @@ class IndicatorProcessor(BaseDataProcessor):
         )
 
         return octi_objects
+
+    @override
+    def send(self, bundle_objects: list[BaseIdentifiedObject]):
+        """
+        Send the transformed data to OpenCTI.
+        This method takes the transformed data and sends it to OpenCTI using the `send` method of the `BaseDataProcessor`.
+        It also updates the state with the last ingested timestamp after sending the data.
+        """
+        self.work_name = f"Indicators on {date.today().isoformat()}"
+        super().send(bundle_objects=bundle_objects)

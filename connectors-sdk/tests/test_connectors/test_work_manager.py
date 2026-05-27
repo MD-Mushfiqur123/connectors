@@ -7,18 +7,18 @@ from connectors_sdk.connectors.external_import._work_manager import (
     WorkManager,
     _Work,
 )
-from connectors_sdk.connectors.external_import.logger import ConnectorLogger
+from connectors_sdk.connectors.external_import.logger import Logger
 
 
 class TestWork:
-    def test_init(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_init(self, mock_helper: MagicMock, mock_logger: Logger):
         work = _Work("w-1", "test-work", mock_helper, mock_logger)
         assert work.id == "w-1"
         assert work.name == "test-work"
         assert work._closed is False
         assert work._has_sent_bundles is False
 
-    def test_create(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_create(self, mock_helper: MagicMock, mock_logger: Logger):
         work = _Work.create(mock_helper, mock_logger, "test-work")
         mock_helper.api.work.initiate_work.assert_called_once_with(
             "test-connector-id", "test-work"
@@ -27,7 +27,7 @@ class TestWork:
         assert work.name == "test-work"
         assert work._closed is False
 
-    def test_send_bundle(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_send_bundle(self, mock_helper: MagicMock, mock_logger: Logger):
         work = _Work("w-1", "test-work", mock_helper, mock_logger)
         work.send_bundle(["obj1", "obj2"])
         mock_helper.stix2_create_bundle.assert_called_once_with(["obj1", "obj2"])
@@ -35,7 +35,7 @@ class TestWork:
         assert work._has_sent_bundles is True
 
     def test_send_bundle_forwards_kwargs(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         work = _Work("w-1", "test-work", mock_helper, mock_logger)
         work.send_bundle(["obj"], update=True)
@@ -45,13 +45,13 @@ class TestWork:
             update=True,
         )
 
-    def test_success(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_success(self, mock_helper: MagicMock, mock_logger: Logger):
         work = _Work("w-1", "test-work", mock_helper, mock_logger)
         work.success("Done")
         mock_helper.api.work.to_processed.assert_called_once_with("w-1", "Done")
         assert work._closed is True
 
-    def test_fail(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_fail(self, mock_helper: MagicMock, mock_logger: Logger):
         work = _Work("w-1", "test-work", mock_helper, mock_logger)
         work.fail("Error occurred")
         mock_helper.api.work.to_processed.assert_called_once_with(
@@ -59,7 +59,7 @@ class TestWork:
         )
         assert work._closed is True
 
-    def test_delete(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_delete(self, mock_helper: MagicMock, mock_logger: Logger):
         work = _Work("w-1", "test-work", mock_helper, mock_logger)
         work._delete()
         mock_helper.api.work.delete.assert_called_once_with(id="w-1")
@@ -75,14 +75,12 @@ class TestWork:
 
 
 class TestWorkManager:
-    def test_init(self, mock_helper: MagicMock, mock_logger: ConnectorLogger):
+    def test_init(self, mock_helper: MagicMock, mock_logger: Logger):
         wm = WorkManager(mock_helper)
         assert wm._current_work is None
         assert wm._active is False
 
-    def test_enter_exit_no_work(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
-    ):
+    def test_enter_exit_no_work(self, mock_helper: MagicMock, mock_logger: Logger):
         wm = WorkManager(mock_helper)
         with wm:
             assert wm._active is True
@@ -90,7 +88,7 @@ class TestWorkManager:
         assert wm._current_work is None
 
     def test_send_creates_work_and_sends(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         with wm:
@@ -103,23 +101,21 @@ class TestWorkManager:
             "work-123", "Work completed successfully"
         )
 
-    def test_send_empty_list_is_noop(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
-    ):
+    def test_send_empty_list_is_noop(self, mock_helper: MagicMock, mock_logger: Logger):
         wm = WorkManager(mock_helper)
         with wm:
             wm.send([], "default")
         mock_helper.api.work.initiate_work.assert_not_called()
 
     def test_send_outside_context_raises(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         with pytest.raises(RuntimeError, match="inside a 'with' block"):
             wm.send(["obj"], "default")
 
     def test_send_same_name_reuses_work(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         with wm:
@@ -131,7 +127,7 @@ class TestWorkManager:
         assert mock_helper.send_stix2_bundle.call_count == 2
 
     def test_send_different_name_closes_previous(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         with wm:
@@ -143,7 +139,7 @@ class TestWorkManager:
         assert mock_helper.api.work.to_processed.call_count == 2
 
     def test_exit_deletes_work_with_no_bundles(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         """Work created but no bundles sent → deleted on exit."""
         mock_helper.send_stix2_bundle.return_value = []
@@ -158,13 +154,13 @@ class TestWorkManager:
         # Manually test: enter, init work, but don't send anything
         wm2.__enter__()
         wm2._current_work = _Work(
-            "w-empty", "default", mock_helper, ConnectorLogger(mock_helper)
+            "w-empty", "default", mock_helper, Logger(mock_helper)
         )
         wm2.__exit__(None, None, None)
         mock_helper.api.work.delete.assert_called_once_with(id="w-empty")
 
     def test_exit_on_exception_marks_failed(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         try:
@@ -178,11 +174,11 @@ class TestWorkManager:
         )
 
     def test_exit_already_closed_work_is_noop(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         wm.__enter__()
-        work = _Work("w-1", "default", mock_helper, ConnectorLogger(mock_helper))
+        work = _Work("w-1", "default", mock_helper, Logger(mock_helper))
         work._closed = True
         wm._current_work = work
         wm.__exit__(None, None, None)
@@ -190,20 +186,18 @@ class TestWorkManager:
         mock_helper.api.work.delete.assert_not_called()
 
     def test_close_current_work_no_bundles_deletes(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
-        wm._current_work = _Work(
-            "w-1", "default", mock_helper, ConnectorLogger(mock_helper)
-        )
+        wm._current_work = _Work("w-1", "default", mock_helper, Logger(mock_helper))
         wm._close_current_work()
         mock_helper.api.work.delete.assert_called_once_with(id="w-1")
 
     def test_close_current_work_with_bundles_succeeds(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
-        work = _Work("w-1", "default", mock_helper, ConnectorLogger(mock_helper))
+        work = _Work("w-1", "default", mock_helper, Logger(mock_helper))
         work._has_sent_bundles = True
         wm._current_work = work
         wm._close_current_work()
@@ -212,13 +206,13 @@ class TestWorkManager:
         )
 
     def test_close_current_work_none_is_noop(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         wm._close_current_work()  # no exception
 
     def test_send_forwards_kwargs_to_send_bundle(
-        self, mock_helper: MagicMock, mock_logger: ConnectorLogger
+        self, mock_helper: MagicMock, mock_logger: Logger
     ):
         wm = WorkManager(mock_helper)
         with wm:

@@ -12,41 +12,37 @@ import traceback
 
 from connector import (
     ConnectorSettings,
-    ConnectorStateManager,
+    ConnectorState,
     IndicatorProcessor,
     ReportProcessor,
 )
 from connectors_sdk import ExternalImportConnector as PouetPouetConnector
 from connectors_sdk import logger
-from pycti import OpenCTIConnectorHelper
 
 if __name__ == "__main__":
     try:
-        logger.info("Starting connector")
+        logger.info("Starting process")
 
         settings = ConnectorSettings()
-        helper = OpenCTIConnectorHelper(config=settings.to_helper_config())
-        state_manager = ConnectorStateManager(helper=helper)  # type: ignore[abstract]
-        report_processor = ReportProcessor(
-            config=settings,
-            helper=helper,
-            state_manager=state_manager,
-        )
-        indicator_processor = IndicatorProcessor(
-            config=settings,
-            helper=helper,
-            state_manager=state_manager,
-        )
+        state = ConnectorState()
+
+        report_processor = ReportProcessor()
+        indicator_processor = IndicatorProcessor()
 
         connector = PouetPouetConnector(
-            config=settings,
-            helper=helper,
-            state_manager=state_manager,
-            data_processors=[report_processor, indicator_processor],
+            settings=settings,
+            state=state,
+            data_processors=[
+                report_processor,
+                indicator_processor,
+            ],
         )
         connector.start()
     except Exception as e:
         logger.error("Unexpected error occurred", {"error": str(e)})
 
         traceback.print_exc()
+
+        logger.error("Killing process (exit code 1)")
+
         exit(1)

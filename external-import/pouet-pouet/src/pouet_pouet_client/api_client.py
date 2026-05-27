@@ -1,30 +1,26 @@
 from datetime import datetime
-from typing import Generator
+from typing import Generator, ClassVar
 
 import requests
-from connectors_sdk import logger
-from pycti import OpenCTIConnectorHelper
+from connectors_sdk import logger as connector_logger
 from pydantic import HttpUrl
 
 
 class PouetPouetClient:
-    def __init__(self, helper: OpenCTIConnectorHelper, base_url: HttpUrl, api_key: str):
+    logger: ClassVar = connector_logger.get_child("PouetPouetClient")
+
+    def __init__(self, base_url: HttpUrl, api_key: str):
         """
         Initialize the client with necessary configuration.
-        For log purpose, the connector's helper CAN be injected.
         Other arguments CAN be added (e.g. `api_key`) if necessary.
 
         Args:
-            helper (OpenCTIConnectorHelper): The helper of the connector. Used for logs.
             base_url (str): The external API base URL.
             api_key (str): The API key to authenticate the connector to the external API.
         """
-        self.helper = helper
-        self.logger = logger.get_child("pouet_pouet_client")
-
         self.base_url = base_url
         # Define headers in session and update when needed
-        headers = {"Bearer": api_key}
+        headers = {"Authorization": f"Bearer {api_key}"}
         self.session = requests.Session()
         self.session.headers.update(headers)
 
@@ -44,7 +40,7 @@ class PouetPouetClient:
         except requests.RequestException as err:
             self.logger.error(
                 "Error while fetching data",
-                {"url_path": {api_url}, "error": {str(err)}},
+                {"url_path": api_url, "error": str(err)},
             )
             return None
 
@@ -57,6 +53,9 @@ class PouetPouetClient:
         _ = since
 
         yield {"id": 123, "name": "Example Entity"}
+        raise Exception(
+            "Example error while fetching reports"
+        )  # Example of error handling
         yield {"id": 456, "name": "Another Example Entity"}
 
     def get_indicators(self) -> list[dict]:

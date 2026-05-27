@@ -4,14 +4,14 @@ This module contains the implementation of the `StateManager` class for the `Pou
 
 from datetime import datetime
 
-from connectors_sdk import ConnectorStateManager as BaseConnectorStateManager
+from connectors_sdk import ExternalImportConnectorState
 from pydantic import Field
 
 
-class ConnectorStateManager(BaseConnectorStateManager):
+class ConnectorState(ExternalImportConnectorState):
     """
     State manager implementation for the `PouetPouetConnector`.
-    This class inherits from `BaseConnectorStateManager`, defines the state attributes that are relevant
+    This class inherits from `ExternalImportConnectorState`, defines the state attributes that are relevant
     for the connector and validates the state data before saving it on OpenCTI.
     """
 

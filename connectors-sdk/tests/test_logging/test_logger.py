@@ -1,10 +1,10 @@
-"""Tests for ConnectorLogger."""
+"""Tests for Logger."""
 
 import logging
 
 import pytest
 from connectors_sdk.logging._base_logger import BaseLogger
-from connectors_sdk.logging.logger import ConnectorLogger, logger
+from connectors_sdk.logging.logger import Logger, logger
 
 
 @pytest.fixture(autouse=True)
@@ -17,36 +17,36 @@ def cleanup_loggers():
             del logging.Logger.manager.loggerDict[name]
 
 
-class TestConnectorLoggerInit:
+class TestLoggerInit:
     def test_default_name_is_connector(self) -> None:
-        test_logger = ConnectorLogger()
+        test_logger = Logger()
         assert test_logger._logger.name == "connector"
 
     def test_default_level_is_info(self) -> None:
-        test_logger = ConnectorLogger()
+        test_logger = Logger()
         assert test_logger._logger.level == logging.INFO
 
     def test_custom_name(self) -> None:
-        test_logger = ConnectorLogger(name="my_connector")
+        test_logger = Logger(name="my_connector")
         assert test_logger._logger.name == "my_connector"
 
     def test_custom_level(self) -> None:
-        test_logger = ConnectorLogger(name="connector_debug", level="debug")
+        test_logger = Logger(name="connector_debug", level="debug")
         assert test_logger._logger.level == logging.DEBUG
 
     def test_is_not_singleton(self) -> None:
-        """ConnectorLogger must NOT be a singleton — each instance is independent."""
-        a = ConnectorLogger(name="connector_a")
-        b = ConnectorLogger(name="connector_b")
+        """Logger must NOT be a singleton — each instance is independent."""
+        a = Logger(name="connector_a")
+        b = Logger(name="connector_b")
         assert a is not b
 
     def test_inherits_from_base_logger(self) -> None:
-        assert isinstance(ConnectorLogger(), BaseLogger)
+        assert isinstance(Logger(), BaseLogger)
 
 
 class TestModuleLevelLogger:
     def test_logger_is_connector_logger_instance(self) -> None:
-        assert isinstance(logger, ConnectorLogger)
+        assert isinstance(logger, Logger)
 
     def test_logger_default_name(self) -> None:
         assert logger._logger.name == "connector"

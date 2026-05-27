@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, ClassVar
 
-from connectors_sdk import logger
+from connectors_sdk import logger as connector_logger
 from connectors_sdk.models import Indicator, OrganizationAuthor, Report, TLPMarking
 from pycti import OpenCTIConnectorHelper
 
@@ -15,22 +15,26 @@ class ConverterToStix:
         e.g. `pycti.Identity.generate_id(name="Source Name", identity_class="organization")` for a STIX Identity.
     """
 
+    logger: ClassVar = connector_logger.get_child("ConverterToStix")
+
     def __init__(
         self,
-        helper: OpenCTIConnectorHelper,
-        tlp_level: Literal["clear", "white", "green", "amber", "amber+strict", "red"],
+        tlp_level: Literal[
+            "clear",
+            "white",
+            "green",
+            "amber",
+            "amber+strict",
+            "red",
+        ],
     ):
         """
         Initialize the converter with necessary configuration.
-        For log purpose, the connector's helper CAN be injected.
         Other arguments CAN be added (e.g. `tlp_level`) if necessary.
 
         Args:
-            helper (OpenCTIConnectorHelper): The helper of the connector. Used for logs.
             tlp_level (str): The TLP level to add to the created STIX entities.
         """
-        self.helper = helper
-        self.logger = logger.get_child("converter_to_stix")
 
         self.author = self.create_author()
         self.tlp_marking = self.create_tlp_marking(level=tlp_level.lower())
